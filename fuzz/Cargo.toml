@@ -1,0 +1,19 @@
+[package]
+name = "edidkit-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+edidkit = { path = ".." }
+
+[[bin]]
+name = "parse_edid"
+path = "fuzz_targets/parse_edid.rs"
+test = false
+doc = false
+bench = false
