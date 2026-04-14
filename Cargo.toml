@@ -1,6 +1,12 @@
 [package]
 name = "edidkit"
 version = "0.1.0"
+description = "Rust library for parsing, inspecting, editing, and re-serializing EDID data"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/fuxuan928/edidkit-rs"
+readme = "README.md"
+keywords = ["edid", "display", "hdmi", "cta861"]
+categories = ["parser-implementations", "encoding"]
 
 [dependencies]

@@ -76,15 +76,18 @@ Editing support currently includes:
 
 ## Installation
 
-This crate is not published yet.
-
-Use it from a local path or git dependency for now.
-
-Example with a local path:
+Install from crates.io:
 
 ```toml
 [dependencies]
-edidkit = { path = "../edidkit" }
+edidkit = "0.1.0"
+```
+
+You can also use a git dependency while developing against the latest main branch:
+
+```toml
+[dependencies]
+edidkit = { git = "https://github.com/fuxuan928/edidkit-rs" }
 ```
 
 ## Public API
