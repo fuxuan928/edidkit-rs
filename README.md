@@ -98,7 +98,7 @@ Protocol-specific types are grouped by module:
 
 ## Examples
 
-Example programs live under [`examples/README.me`](examples/README.me).
+Example programs live under [`examples/README.md`](examples/README.md).
 
 ## Quick Start
 
