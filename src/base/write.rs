@@ -1,6 +1,6 @@
 use crate::{
-    model::{BaseBlock, Descriptor},
-    utils::{encode_descriptor_text, encode_manufacturer_id, fix_checksum},
+    base::{BaseBlock, descriptor::write_descriptor},
+    utils::{encode_manufacturer_id, fix_checksum},
 };
 
 pub(crate) fn write_base_block(base: &BaseBlock) -> [u8; 128] {
@@ -29,13 +29,13 @@ pub(crate) fn write_base_block(base: &BaseBlock) -> [u8; 128] {
 
 fn write_video_input_definition(base: &BaseBlock) -> u8 {
     match &base.video_input_definition {
-        crate::VideoInputDefinition::Analog(input) => {
+        crate::base::VideoInputDefinition::Analog(input) => {
             (u8::from(input.separate_sync_supported) << 3)
                 | (u8::from(input.composite_sync_on_hsync_supported) << 2)
                 | (u8::from(input.composite_sync_on_green_supported) << 1)
                 | u8::from(input.serration_supported)
         }
-        crate::VideoInputDefinition::Digital(input) => {
+        crate::base::VideoInputDefinition::Digital(input) => {
             let mut value = 0x80;
             if base.version.major > 1 || (base.version.major == 1 && base.version.minor >= 4) {
                 value |= match input.color_bit_depth {
@@ -54,23 +54,4 @@ fn write_video_input_definition(base: &BaseBlock) -> u8 {
             value
         }
     }
-}
-
-fn write_descriptor(descriptor: &Descriptor) -> [u8; 18] {
-    match descriptor {
-        Descriptor::DetailedTiming(timing) => timing.raw,
-        Descriptor::MonitorName(name) => write_text_descriptor(0xfc, name),
-        Descriptor::MonitorSerial(serial) => write_text_descriptor(0xff, serial),
-        Descriptor::RangeLimits(range) => range.raw,
-        Descriptor::Unknown(raw) => *raw,
-    }
-}
-
-fn write_text_descriptor(tag: u8, text: &str) -> [u8; 18] {
-    let mut descriptor = [0_u8; 18];
-    descriptor[3] = tag;
-    if let Ok(encoded) = encode_descriptor_text(text) {
-        descriptor[5..18].copy_from_slice(&encoded);
-    }
-    descriptor
 }

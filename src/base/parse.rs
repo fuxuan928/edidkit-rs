@@ -1,12 +1,10 @@
 use crate::{
-    error::EdidError,
-    model::{
+    base::{
         AnalogVideoInput, BaseBlock, DigitalVideoInput, EdidVersion, ManufactureDate,
-        ManufacturerId, VideoInputDefinition,
+        ManufacturerId, VideoInputDefinition, descriptor::parse_descriptor,
     },
+    error::EdidError,
 };
-
-use super::descriptor::parse_descriptor;
 
 pub(crate) fn parse_base_block(block: &[u8]) -> Result<BaseBlock, EdidError> {
     if block.len() != 128 {

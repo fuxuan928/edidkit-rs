@@ -82,6 +82,24 @@ Example with a local path:
 edidkit = { path = "../edidkit" }
 ```
 
+## Public API
+
+Crate root exports the document-level entry points:
+
+- `edidkit::Edid`
+- `edidkit::ExtensionBlock`
+- `edidkit::EdidError`
+
+Protocol-specific types are grouped by module:
+
+- `edidkit::base` for base EDID and descriptors
+- `edidkit::cta861` for CTA-861 extensions and data blocks
+- `edidkit::displayid` for DisplayID extensions and data blocks
+
+## Examples
+
+Example programs live under [`examples/README.me`](examples/README.me).
+
 ## Quick Start
 
 Parse EDID bytes:
@@ -139,7 +157,8 @@ fn patch_cta(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 Inspect extension types:
 
 ```rust
-use edidkit::{DataBlock, Edid, ExtensionBlock};
+use edidkit::{Edid, ExtensionBlock};
+use edidkit::cta861::DataBlock;
 
 fn print_extensions(bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let edid = Edid::parse(bytes)?;
@@ -180,6 +199,88 @@ fn print_extensions(bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+Inspect base EDID descriptors:
+
+```rust
+use edidkit::Edid;
+use edidkit::base::Descriptor;
+
+fn monitor_name(bytes: &[u8]) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let edid = Edid::parse(bytes)?;
+
+    let name = edid.base.descriptors.iter().find_map(|descriptor| match descriptor {
+        Descriptor::MonitorName(name) => Some(name.clone()),
+        _ => None,
+    });
+
+    Ok(name)
+}
+```
+
+Inspect DisplayID data block kinds:
+
+```rust
+use edidkit::{Edid, ExtensionBlock};
+use edidkit::displayid::DisplayIdDataBlockKind;
+
+fn print_displayid(bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    let edid = Edid::parse(bytes)?;
+
+    for extension in &edid.extensions {
+        if let ExtensionBlock::DisplayId(display_id) = extension {
+            println!(
+                "DisplayID v{}.{} with {} blocks",
+                display_id.version,
+                display_id.revision,
+                display_id.data_blocks.len()
+            );
+
+            for block in &display_id.data_blocks {
+                match &block.kind {
+                    DisplayIdDataBlockKind::Product(_) => println!("product block: tag 0x{:02x}", block.tag),
+                    DisplayIdDataBlockKind::VendorSpecific(_) => {
+                        println!("vendor block: tag 0x{:02x}", block.tag)
+                    }
+                    DisplayIdDataBlockKind::Unknown => println!("unknown block: tag 0x{:02x}", block.tag),
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+```
+
+End-to-end file workflow example:
+
+```bash
+cargo run --example edit_monitor_name -- input.edid output.edid RK-UHD-ALT
+```
+
+`input.edid` and `output.edid` are placeholder file paths to your EDID binary files.
+
+If you run the example with no arguments, it uses a built-in demo EDID, writes to `target/examples/edited-monitor-name.edid`, and renames the monitor to `RK-UHD-ALT`:
+
+```bash
+cargo run --example edit_monitor_name
+```
+
+The example reads an EDID file, prints a summary, updates the monitor name, writes the new file, and prints the updated summary.
+
+Extension inspection example:
+
+```bash
+cargo run --example print_extensions -- input.edid
+```
+
+If you run it with no arguments, it uses the same built-in demo EDID:
+
+```bash
+cargo run --example print_extensions
+```
+
+The example reads one EDID file and prints base information plus all CTA-861 and DisplayID extension details it can decode today.
 
 ## Design
 
@@ -271,12 +372,13 @@ Project layout:
 
 ```text
 src/
+├── base/
+├── cta861/
+├── displayid/
+├── edid/
 ├── error.rs
 ├── lib.rs
-├── model/
-├── parser/
 ├── utils/
-└── writer/
 ```
 
 Fuzz targets live under `fuzz/`.

@@ -1,4 +1,4 @@
-use super::descriptor::Descriptor;
+use super::Descriptor;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManufacturerId(pub String);
@@ -7,6 +7,12 @@ pub struct ManufacturerId(pub String);
 pub struct ManufactureDate {
     pub week: u8,
     pub year: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EdidVersion {
+    pub major: u8,
+    pub minor: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,7 +42,7 @@ pub struct BaseBlock {
     pub product_code: u16,
     pub serial_number: u32,
     pub manufacture_date: ManufactureDate,
-    pub version: super::edid::EdidVersion,
+    pub version: EdidVersion,
     pub video_input_definition: VideoInputDefinition,
     pub extension_count: u8,
     pub descriptors: Vec<Descriptor>,

@@ -1,4 +1,4 @@
-use crate::EdidError;
+use crate::error::EdidError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VideoBlock {

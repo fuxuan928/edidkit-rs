@@ -1,8 +1,33 @@
-use crate::{
-    error::EdidError,
-    model::{Descriptor, DetailedTiming, RangeLimits},
-    utils::BitReader,
-};
+use crate::{error::EdidError, utils::BitReader};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DetailedTiming {
+    pub pixel_clock_khz: u32,
+    pub horizontal_active: u16,
+    pub horizontal_blanking: u16,
+    pub vertical_active: u16,
+    pub vertical_blanking: u16,
+    pub raw: [u8; 18],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RangeLimits {
+    pub min_vertical_hz: u8,
+    pub max_vertical_hz: u8,
+    pub min_horizontal_khz: u8,
+    pub max_horizontal_khz: u8,
+    pub max_pixel_clock_mhz: u16,
+    pub raw: [u8; 18],
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Descriptor {
+    DetailedTiming(DetailedTiming),
+    MonitorName(String),
+    MonitorSerial(String),
+    RangeLimits(RangeLimits),
+    Unknown([u8; 18]),
+}
 
 pub(crate) fn parse_descriptor(bytes: &[u8]) -> Result<Descriptor, EdidError> {
     if bytes.len() != 18 {
@@ -52,4 +77,23 @@ pub(crate) fn parse_descriptor(bytes: &[u8]) -> Result<Descriptor, EdidError> {
         })),
         _ => Ok(Descriptor::Unknown(raw)),
     }
+}
+
+pub(crate) fn write_descriptor(descriptor: &Descriptor) -> [u8; 18] {
+    match descriptor {
+        Descriptor::DetailedTiming(timing) => timing.raw,
+        Descriptor::MonitorName(name) => write_text_descriptor(0xfc, name),
+        Descriptor::MonitorSerial(serial) => write_text_descriptor(0xff, serial),
+        Descriptor::RangeLimits(range) => range.raw,
+        Descriptor::Unknown(raw) => *raw,
+    }
+}
+
+fn write_text_descriptor(tag: u8, text: &str) -> [u8; 18] {
+    let mut descriptor = [0_u8; 18];
+    descriptor[3] = tag;
+    if let Ok(encoded) = crate::utils::encode_descriptor_text(text) {
+        descriptor[5..18].copy_from_slice(&encoded);
+    }
+    descriptor
 }

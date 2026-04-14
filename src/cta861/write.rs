@@ -1,5 +1,5 @@
 use crate::{
-    model::{Cta861Extension, DataBlock, VendorBlock},
+    cta861::{Cta861Extension, DataBlock, VendorBlock},
     utils::fix_checksum,
 };
 

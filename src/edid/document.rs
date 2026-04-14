@@ -1,11 +1,25 @@
-use crate::{error::EdidError, parser, writer};
+use crate::{
+    base::{BaseBlock, Descriptor},
+    cta861::Cta861Extension,
+    displayid::DisplayIdExtension,
+    error::EdidError,
+};
 
-use super::{BaseBlock, ExtensionBlock};
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExtensionBlock {
+    Cta861(Cta861Extension),
+    DisplayId(DisplayIdExtension),
+    Unknown(Vec<u8>),
+}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EdidVersion {
-    pub major: u8,
-    pub minor: u8,
+impl ExtensionBlock {
+    pub fn raw_bytes(&self) -> &[u8] {
+        match self {
+            Self::Cta861(cta) => &cta.raw_block,
+            Self::DisplayId(display_id) => &display_id.raw_block,
+            Self::Unknown(bytes) => bytes,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,11 +31,11 @@ pub struct Edid {
 
 impl Edid {
     pub fn parse(data: &[u8]) -> Result<Self, EdidError> {
-        parser::parse_edid(data)
+        super::parse::parse_edid(data)
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        writer::write_edid(self)
+        super::write::write_edid(self)
     }
 
     pub fn set_product_code(&mut self, code: u16) {
@@ -32,7 +46,7 @@ impl Edid {
         crate::utils::validate_descriptor_text(name)?;
 
         for descriptor in &mut self.base.descriptors {
-            if let super::Descriptor::MonitorName(existing) = descriptor {
+            if let Descriptor::MonitorName(existing) = descriptor {
                 *existing = name.to_owned();
                 return Ok(());
             }

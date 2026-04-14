@@ -1,9 +1,9 @@
 use crate::{
-    error::EdidError,
-    model::{
+    displayid::{
         DisplayIdDataBlock, DisplayIdDataBlockKind, DisplayIdExtension, DisplayIdProductDataBlock,
         DisplayIdVendorSpecificDataBlock,
     },
+    error::EdidError,
 };
 
 pub(crate) fn parse_displayid_extension(block: &[u8]) -> Result<DisplayIdExtension, EdidError> {

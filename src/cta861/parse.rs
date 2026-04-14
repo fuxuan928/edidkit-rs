@@ -1,9 +1,9 @@
 use crate::{
-    error::EdidError,
-    model::{
-        AudioBlock, Cta861Extension, DataBlock, ExtendedTagBlock, HdrStaticMetadataBlock,
-        SpeakerAllocationBlock, VendorBlock, VideoBlock,
+    cta861::{
+        AudioBlock, Cta861Extension, DataBlock, ExtendedTagBlock, HdmiVendorBlock,
+        HdrStaticMetadataBlock, SpeakerAllocationBlock, VendorBlock, VideoBlock,
     },
+    error::EdidError,
 };
 
 pub(crate) fn parse_cta861_extension(block: &[u8]) -> Result<Cta861Extension, EdidError> {
@@ -124,7 +124,7 @@ fn parse_hdr_static_metadata_block(payload: &[u8]) -> Result<DataBlock, EdidErro
     }))
 }
 
-fn parse_hdmi_vendor_block(oui: [u8; 3], payload: &[u8]) -> Option<crate::model::HdmiVendorBlock> {
+fn parse_hdmi_vendor_block(oui: [u8; 3], payload: &[u8]) -> Option<HdmiVendorBlock> {
     if oui != [0x03, 0x0c, 0x00] || payload.len() < 3 {
         return None;
     }
@@ -166,7 +166,7 @@ fn parse_hdmi_vendor_block(oui: [u8; 3], payload: &[u8]) -> Option<crate::model:
             None
         };
 
-    Some(crate::model::HdmiVendorBlock {
+    Some(HdmiVendorBlock {
         physical_address: [
             payload[0] >> 4,
             payload[0] & 0x0f,

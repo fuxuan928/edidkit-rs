@@ -1,15 +1,10 @@
-mod error;
-mod model;
-mod parser;
-mod utils;
-mod writer;
+pub mod base;
+pub mod cta861;
+pub mod displayid;
 
+mod edid;
+mod error;
+mod utils;
+
+pub use edid::{Edid, ExtensionBlock};
 pub use error::EdidError;
-pub use model::{
-    AnalogVideoInput, AudioBlock, BaseBlock, Cta861Extension, DataBlock, Descriptor,
-    DetailedTiming, DigitalVideoInput, DisplayIdDataBlock, DisplayIdDataBlockKind,
-    DisplayIdExtension, DisplayIdProductDataBlock, DisplayIdVendorSpecificDataBlock, Edid,
-    EdidVersion, ExtendedTagBlock, ExtensionBlock, HdmiVendorBlock, HdrStaticMetadataBlock,
-    ManufactureDate, ManufacturerId, RangeLimits, SpeakerAllocationBlock, VendorBlock, VideoBlock,
-    VideoInputDefinition,
-};

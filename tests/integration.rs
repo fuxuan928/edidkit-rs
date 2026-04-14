@@ -1,4 +1,7 @@
-use edidkit::{DataBlock, Descriptor, Edid, EdidError, ExtensionBlock};
+use edidkit::base::{Descriptor, VideoInputDefinition};
+use edidkit::cta861::{DataBlock, HdrStaticMetadataBlock};
+use edidkit::displayid::DisplayIdDataBlockKind;
+use edidkit::{Edid, EdidError, ExtensionBlock};
 
 const EDID_FORCE_GBR24: [u8; 256] = [
     0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x49, 0x70, 0x88, 0x35, 0x01, 0x00, 0x00, 0x00,
@@ -78,7 +81,7 @@ fn parses_base_only_sample() {
     assert_eq!(edid.extensions.len(), 0);
     assert!(matches!(
         edid.base.video_input_definition,
-        edidkit::VideoInputDefinition::Digital(_)
+        VideoInputDefinition::Digital(_)
     ));
     assert!(matches!(
         edid.base.descriptors[0],
@@ -93,8 +96,7 @@ fn parses_version_aware_analog_video_input() {
     fix_checksum(&mut sample);
 
     let edid = Edid::parse(&sample).unwrap();
-    let edidkit::VideoInputDefinition::Analog(video_input) = edid.base.video_input_definition
-    else {
+    let VideoInputDefinition::Analog(video_input) = edid.base.video_input_definition else {
         panic!("expected analog video input");
     };
 
@@ -125,14 +127,14 @@ fn parses_displayid_extension() {
     assert_eq!(display_id.data_blocks[0].payload, vec![0x12, 0x34, 0x56]);
     assert!(matches!(
         display_id.data_blocks[0].kind,
-        edidkit::DisplayIdDataBlockKind::Product(_)
+        DisplayIdDataBlockKind::Product(_)
     ));
     assert_eq!(display_id.data_blocks[1].tag, 0x7f);
     assert_eq!(display_id.data_blocks[1].revision, 0x00);
     assert_eq!(display_id.data_blocks[1].payload, vec![0xaa, 0xbb]);
     assert!(matches!(
         display_id.data_blocks[1].kind,
-        edidkit::DisplayIdDataBlockKind::VendorSpecific(_)
+        DisplayIdDataBlockKind::VendorSpecific(_)
     ));
 }
 
@@ -601,15 +603,14 @@ fn make_hdr_static_metadata_sample() -> Vec<u8> {
         panic!("expected CTA-861 extension");
     };
 
-    cta.data_blocks.push(DataBlock::HdrStaticMetadata(
-        edidkit::HdrStaticMetadataBlock {
+    cta.data_blocks
+        .push(DataBlock::HdrStaticMetadata(HdrStaticMetadataBlock {
             electro_optical_transfer_functions: 0x05,
             static_metadata_descriptors: 0x01,
             desired_content_max_luminance: Some(0x64),
             desired_content_max_frame_average_luminance: Some(0x32),
             desired_content_min_luminance: Some(0x0a),
-        },
-    ));
+        }));
 
     edid.to_bytes()
 }

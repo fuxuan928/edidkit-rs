@@ -1,14 +1,9 @@
-mod base;
-mod cta861;
-mod descriptor;
-mod displayid;
-
 use crate::{
+    base::parse_base_block, cta861::parse_cta861_extension, displayid::parse_displayid_extension,
     error::EdidError,
-    model::{Edid, ExtensionBlock},
 };
 
-pub(crate) use base::parse_base_block;
+use super::{Edid, ExtensionBlock};
 
 pub(crate) fn parse_edid(data: &[u8]) -> Result<Edid, EdidError> {
     if data.len() < 128 || data.len() % 128 != 0 {
@@ -32,8 +27,8 @@ pub(crate) fn parse_edid(data: &[u8]) -> Result<Edid, EdidError> {
         crate::utils::validate_checksum(block, index + 1)?;
 
         let extension = match block[0] {
-            0x02 => ExtensionBlock::Cta861(cta861::parse_cta861_extension(block)?),
-            0x70 => ExtensionBlock::DisplayId(displayid::parse_displayid_extension(block)?),
+            0x02 => ExtensionBlock::Cta861(parse_cta861_extension(block)?),
+            0x70 => ExtensionBlock::DisplayId(parse_displayid_extension(block)?),
             _ => ExtensionBlock::Unknown(block.to_vec()),
         };
         extensions.push(extension);
