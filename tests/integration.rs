@@ -90,6 +90,16 @@ fn parses_base_only_sample() {
 }
 
 #[test]
+fn parses_zeroed_descriptor_as_unused() {
+    let mut sample = EDID_600M_U2418;
+    sample[90..108].fill(0);
+    fix_checksum(&mut sample);
+
+    let edid = Edid::parse(&sample).unwrap();
+    assert!(matches!(edid.base.descriptors[2], Descriptor::Unused));
+}
+
+#[test]
 fn parses_version_aware_analog_video_input() {
     let mut sample = EDID_600M_U2418;
     sample[20] = 0x0f;
@@ -148,7 +158,7 @@ fn round_trip_preserves_all_sample_bytes() {
         make_displayid_sample().as_slice(),
     ] {
         let edid = Edid::parse(sample).unwrap();
-        assert_eq!(edid.to_bytes(), sample);
+        assert_eq!(edid.to_bytes().unwrap(), sample);
     }
 }
 
@@ -283,7 +293,7 @@ fn updates_product_code_and_monitor_name() {
     edid.set_product_code(0x4321);
     edid.set_monitor_name("RK-UHD-ALT").unwrap();
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
 
     assert_eq!(reparsed.base.product_code, 0x4321);
@@ -293,9 +303,178 @@ fn updates_product_code_and_monitor_name() {
 }
 
 #[test]
+fn set_monitor_name_reuses_unused_slot() {
+    let mut edid = Edid::parse(&EDID_600M_U2418).unwrap();
+    edid.base.descriptors[2] = Descriptor::Unused;
+
+    edid.set_monitor_name("U2418").unwrap();
+
+    let reparsed = Edid::parse(&edid.to_bytes().unwrap()).unwrap();
+    assert_eq!(reparsed.monitor_name(), Some("U2418"));
+    assert!(matches!(
+        reparsed.base.descriptors[2],
+        Descriptor::MonitorName(_)
+    ));
+}
+
+#[test]
+fn set_monitor_serial_reuses_unused_slot() {
+    let mut edid = Edid::parse(&EDID_600M_U2418).unwrap();
+    edid.base.descriptors[2] = Descriptor::Unused;
+
+    edid.set_monitor_serial("SN123").unwrap();
+
+    let reparsed = Edid::parse(&edid.to_bytes().unwrap()).unwrap();
+    assert_eq!(reparsed.monitor_serial(), Some("SN123"));
+    assert!(matches!(
+        reparsed.base.descriptors[2],
+        Descriptor::MonitorSerial(_)
+    ));
+}
+
+#[test]
+fn reads_product_view() {
+    let edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
+
+    assert_eq!(
+        edid.product(),
+        edidkit::Product {
+            manufacturer_id: "RKP".to_owned(),
+            product_code: 0x3588,
+            serial_number: 0x0000_0001,
+            monitor_name: Some("RK-UHD".to_owned()),
+            monitor_serial: None,
+        }
+    );
+
+    assert_eq!(edid.monitor_name(), Some("RK-UHD"));
+    assert_eq!(edid.monitor_serial(), None);
+}
+
+#[test]
+fn updates_product_via_struct_api() {
+    let mut edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
+    let mut product = edid.product();
+    product.product_code = 0x4321;
+    product.monitor_name = Some("RK-UHD-ALT".to_owned());
+
+    edid.set_product(&product).unwrap();
+
+    let reparsed = Edid::parse(&edid.to_bytes().unwrap()).unwrap();
+    assert_eq!(reparsed.product(), product);
+}
+
+#[test]
+fn removes_monitor_name_via_struct_api() {
+    let mut edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
+    assert!(matches!(
+        edid.base.descriptors[2],
+        Descriptor::MonitorName(_)
+    ));
+    assert!(matches!(
+        edid.base.descriptors[3],
+        Descriptor::RangeLimits(_)
+    ));
+    let mut product = edid.product();
+    product.monitor_name = None;
+
+    edid.set_product(&product).unwrap();
+    assert!(matches!(edid.base.descriptors[2], Descriptor::Unused));
+    assert!(matches!(
+        edid.base.descriptors[3],
+        Descriptor::RangeLimits(_)
+    ));
+
+    let reparsed = Edid::parse(&edid.to_bytes().unwrap()).unwrap();
+    assert_eq!(reparsed.product().monitor_name, None);
+    assert!(matches!(reparsed.base.descriptors[2], Descriptor::Unused));
+    assert!(matches!(
+        reparsed.base.descriptors[3],
+        Descriptor::RangeLimits(_)
+    ));
+}
+
+#[test]
+fn adds_monitor_name_via_struct_api_when_slot_is_available() {
+    let mut edid = Edid::parse(&EDID_600M_U2418).unwrap();
+    edid.base.descriptors[2] = Descriptor::Unused;
+
+    let mut product = edid.product();
+    product.monitor_name = Some("U2418".to_owned());
+
+    edid.set_product(&product).unwrap();
+    assert!(matches!(
+        edid.base.descriptors[2],
+        Descriptor::MonitorName(_)
+    ));
+
+    let reparsed = Edid::parse(&edid.to_bytes().unwrap()).unwrap();
+    assert_eq!(reparsed.product().monitor_name, Some("U2418".to_owned()));
+}
+
+#[test]
+fn rejects_product_update_when_no_descriptor_slot_is_available() {
+    let mut edid = Edid::parse(&EDID_600M_U2418).unwrap();
+    edid.base.descriptors[2] = Descriptor::Unknown([
+        0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00,
+    ]);
+    edid.base.descriptors[3] = Descriptor::RangeLimits(edidkit::base::RangeLimits {
+        min_vertical_hz: 48,
+        max_vertical_hz: 75,
+        min_horizontal_khz: 30,
+        max_horizontal_khz: 83,
+        max_pixel_clock_mhz: 170,
+        raw: [
+            0x00, 0x00, 0x00, 0xfd, 0x00, 48, 75, 30, 83, 17, 0x00, 0x0a, 0x20, 0x20, 0x20, 0x20,
+            0x20, 0x20,
+        ],
+    });
+    let mut product = edid.product();
+    product.monitor_name = Some("U2418".to_owned());
+
+    let error = edid.set_product(&product).unwrap_err();
+    assert!(matches!(error, EdidError::ValidationError(_)));
+}
+
+#[test]
+fn rejects_invalid_manufacturer_id_via_struct_api() {
+    let mut edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
+    let mut product = edid.product();
+    product.manufacturer_id = "bad".to_owned();
+
+    let error = edid.set_product(&product).unwrap_err();
+    assert!(matches!(error, EdidError::ValidationError(_)));
+}
+
+#[test]
+fn rejects_invalid_manufacturer_id_during_write() {
+    let mut edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
+    edid.base.manufacturer_id.0 = "bad".to_owned();
+
+    let error = edid.to_bytes().unwrap_err();
+    assert!(matches!(error, EdidError::ValidationError(_)));
+}
+
+#[test]
+fn rejects_invalid_cta_data_block_tag_during_write() {
+    let mut edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
+    let ExtensionBlock::Cta861(cta) = &mut edid.extensions[0] else {
+        panic!("expected CTA-861 extension");
+    };
+    cta.data_blocks.push(DataBlock::Unknown {
+        tag: 0x08,
+        payload: vec![0x01],
+    });
+
+    let error = edid.to_bytes().unwrap_err();
+    assert!(matches!(error, EdidError::ValidationError(_)));
+}
+
+#[test]
 fn rewrites_cta_extension_from_typed_model_without_changes() {
     let edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
 
     assert_eq!(bytes, EDID_FORCE_GBR24);
 }
@@ -312,7 +491,7 @@ fn serializes_cta_video_block_mutation() {
     };
     video.vic_codes[0] = 0x10;
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
     let ExtensionBlock::Cta861(cta) = &reparsed.extensions[0] else {
         panic!("expected CTA-861 extension");
@@ -336,7 +515,7 @@ fn serializes_cta_extended_block_mutation() {
     };
     block.payload[1] = 0x09;
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
     let ExtensionBlock::Cta861(cta) = &reparsed.extensions[0] else {
         panic!("expected CTA-861 extension");
@@ -363,7 +542,7 @@ fn serializes_hdr_static_metadata_mutation() {
     hdr_block.desired_content_max_luminance = Some(0x70);
     hdr_block.desired_content_min_luminance = Some(0x08);
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
     let ExtensionBlock::Cta861(cta) = &reparsed.extensions[0] else {
         panic!("expected CTA-861 extension");
@@ -390,7 +569,7 @@ fn adds_and_removes_cta_video_vics_via_api() {
     assert!(cta.remove_video_vic(0x07));
     assert!(!cta.remove_video_vic(0x07));
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
     let ExtensionBlock::Cta861(cta) = &reparsed.extensions[0] else {
         panic!("expected CTA-861 extension");
@@ -412,7 +591,7 @@ fn updates_speaker_allocation_via_api() {
 
     cta.set_speaker_allocation(&[0x05, 0x00, 0x00]);
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
     let ExtensionBlock::Cta861(cta) = &reparsed.extensions[0] else {
         panic!("expected CTA-861 extension");
@@ -433,7 +612,7 @@ fn updates_hdmi_max_tmds_clock_via_api() {
 
     cta.set_hdmi_max_tmds_clock_mhz(300).unwrap();
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
     let ExtensionBlock::Cta861(cta) = &reparsed.extensions[0] else {
         panic!("expected CTA-861 extension");
@@ -454,7 +633,7 @@ fn updates_hdmi_content_types_via_api() {
 
     cta.set_hdmi_content_types(true, false, true, true).unwrap();
 
-    let bytes = edid.to_bytes();
+    let bytes = edid.to_bytes().unwrap();
     let reparsed = Edid::parse(&bytes).unwrap();
     let ExtensionBlock::Cta861(cta) = &reparsed.extensions[0] else {
         panic!("expected CTA-861 extension");
@@ -486,6 +665,13 @@ fn rejects_invalid_hdmi_max_tmds_clock() {
 fn rejects_monitor_name_longer_than_13_characters() {
     let mut edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
     let error = edid.set_monitor_name("0123456789ABCD").unwrap_err();
+    assert!(matches!(error, EdidError::ValidationError(_)));
+}
+
+#[test]
+fn rejects_monitor_serial_longer_than_13_characters() {
+    let mut edid = Edid::parse(&EDID_FORCE_GBR24).unwrap();
+    let error = edid.set_monitor_serial("0123456789ABCD").unwrap_err();
     assert!(matches!(error, EdidError::ValidationError(_)));
 }
 
@@ -612,5 +798,5 @@ fn make_hdr_static_metadata_sample() -> Vec<u8> {
             desired_content_min_luminance: Some(0x0a),
         }));
 
-    edid.to_bytes()
+    edid.to_bytes().unwrap()
 }

@@ -45,6 +45,9 @@ pub struct BaseBlock {
     pub version: EdidVersion,
     pub video_input_definition: VideoInputDefinition,
     pub extension_count: u8,
-    pub descriptors: Vec<Descriptor>,
+    /// The four descriptor slots stored in the base EDID block.
+    ///
+    /// Empty on-wire slots are represented as [`Descriptor::Unused`].
+    pub descriptors: [Descriptor; 4],
     pub raw_block: [u8; 128],
 }

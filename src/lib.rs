@@ -6,5 +6,5 @@ mod edid;
 mod error;
 mod utils;
 
-pub use edid::{Edid, ExtensionBlock};
+pub use edid::{Edid, ExtensionBlock, Product};
 pub use error::EdidError;

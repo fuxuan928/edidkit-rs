@@ -61,8 +61,13 @@ DisplayID support includes:
 
 Editing support currently includes:
 
+- `product`
+- `set_product`
+- `monitor_name`
+- `monitor_serial`
 - `set_product_code`
 - `set_monitor_name`
+- `set_monitor_serial`
 - `Cta861Extension::add_video_vic`
 - `Cta861Extension::remove_video_vic`
 - `Cta861Extension::set_speaker_allocation`
@@ -88,6 +93,7 @@ Crate root exports the document-level entry points:
 
 - `edidkit::Edid`
 - `edidkit::ExtensionBlock`
+- `edidkit::Product`
 - `edidkit::EdidError`
 
 Protocol-specific types are grouped by module:
@@ -126,10 +132,12 @@ use edidkit::Edid;
 fn rewrite(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut edid = Edid::parse(bytes)?;
 
-    edid.set_product_code(0x4321);
-    edid.set_monitor_name("RK-UHD-ALT")?;
+    let mut product = edid.product();
+    product.product_code = 0x4321;
+    product.monitor_name = Some("RK-UHD-ALT".to_owned());
+    edid.set_product(&product)?;
 
-    Ok(edid.to_bytes())
+    Ok(edid.to_bytes()?)
 }
 ```
 
@@ -150,7 +158,7 @@ fn patch_cta(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         }
     }
 
-    Ok(edid.to_bytes())
+    Ok(edid.to_bytes()?)
 }
 ```
 
@@ -204,17 +212,10 @@ Inspect base EDID descriptors:
 
 ```rust
 use edidkit::Edid;
-use edidkit::base::Descriptor;
-
 fn monitor_name(bytes: &[u8]) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let edid = Edid::parse(bytes)?;
 
-    let name = edid.base.descriptors.iter().find_map(|descriptor| match descriptor {
-        Descriptor::MonitorName(name) => Some(name.clone()),
-        _ => None,
-    });
-
-    Ok(name)
+    Ok(edid.monitor_name().map(str::to_owned))
 }
 ```
 

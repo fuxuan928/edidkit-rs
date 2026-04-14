@@ -22,6 +22,8 @@ pub struct RangeLimits {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Descriptor {
+    /// An empty 18-byte descriptor slot (`00 00 ... 00`).
+    Unused,
     DetailedTiming(DetailedTiming),
     MonitorName(String),
     MonitorSerial(String),
@@ -38,6 +40,10 @@ pub(crate) fn parse_descriptor(bytes: &[u8]) -> Result<Descriptor, EdidError> {
 
     let mut raw = [0_u8; 18];
     raw.copy_from_slice(bytes);
+
+    if raw == [0_u8; 18] {
+        return Ok(Descriptor::Unused);
+    }
 
     if bytes[0] != 0 || bytes[1] != 0 {
         let pixel_clock_khz = u32::from(u16::from_le_bytes([bytes[0], bytes[1]])) * 10;
@@ -79,21 +85,21 @@ pub(crate) fn parse_descriptor(bytes: &[u8]) -> Result<Descriptor, EdidError> {
     }
 }
 
-pub(crate) fn write_descriptor(descriptor: &Descriptor) -> [u8; 18] {
+pub(crate) fn write_descriptor(descriptor: &Descriptor) -> Result<[u8; 18], EdidError> {
     match descriptor {
-        Descriptor::DetailedTiming(timing) => timing.raw,
+        Descriptor::Unused => Ok([0_u8; 18]),
+        Descriptor::DetailedTiming(timing) => Ok(timing.raw),
         Descriptor::MonitorName(name) => write_text_descriptor(0xfc, name),
         Descriptor::MonitorSerial(serial) => write_text_descriptor(0xff, serial),
-        Descriptor::RangeLimits(range) => range.raw,
-        Descriptor::Unknown(raw) => *raw,
+        Descriptor::RangeLimits(range) => Ok(range.raw),
+        Descriptor::Unknown(raw) => Ok(*raw),
     }
 }
 
-fn write_text_descriptor(tag: u8, text: &str) -> [u8; 18] {
+fn write_text_descriptor(tag: u8, text: &str) -> Result<[u8; 18], EdidError> {
     let mut descriptor = [0_u8; 18];
     descriptor[3] = tag;
-    if let Ok(encoded) = crate::utils::encode_descriptor_text(text) {
-        descriptor[5..18].copy_from_slice(&encoded);
-    }
-    descriptor
+    let encoded = crate::utils::encode_descriptor_text(text)?;
+    descriptor[5..18].copy_from_slice(&encoded);
+    Ok(descriptor)
 }

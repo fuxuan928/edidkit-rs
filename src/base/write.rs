@@ -1,14 +1,14 @@
 use crate::{
     base::{BaseBlock, descriptor::write_descriptor},
+    error::EdidError,
     utils::{encode_manufacturer_id, fix_checksum},
 };
 
-pub(crate) fn write_base_block(base: &BaseBlock) -> [u8; 128] {
+pub(crate) fn write_base_block(base: &BaseBlock) -> Result<[u8; 128], EdidError> {
     let mut block = base.raw_block;
 
-    if let Ok(manufacturer_id) = encode_manufacturer_id(&base.manufacturer_id.0) {
-        block[8..10].copy_from_slice(&manufacturer_id);
-    }
+    let manufacturer_id = encode_manufacturer_id(&base.manufacturer_id.0)?;
+    block[8..10].copy_from_slice(&manufacturer_id);
     block[10..12].copy_from_slice(&base.product_code.to_le_bytes());
     block[12..16].copy_from_slice(&base.serial_number.to_le_bytes());
     block[16] = base.manufacture_date.week;
@@ -18,13 +18,13 @@ pub(crate) fn write_base_block(base: &BaseBlock) -> [u8; 128] {
     block[20] = write_video_input_definition(base);
     block[126] = base.extension_count;
 
-    for (index, descriptor) in base.descriptors.iter().enumerate().take(4) {
+    for index in 0..4 {
         let start = 54 + index * 18;
-        block[start..start + 18].copy_from_slice(&write_descriptor(descriptor));
+        block[start..start + 18].copy_from_slice(&write_descriptor(&base.descriptors[index])?);
     }
 
     fix_checksum(&mut block);
-    block
+    Ok(block)
 }
 
 fn write_video_input_definition(base: &BaseBlock) -> u8 {

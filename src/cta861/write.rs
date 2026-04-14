@@ -1,15 +1,16 @@
 use crate::{
     cta861::{Cta861Extension, DataBlock, VendorBlock},
+    error::EdidError,
     utils::fix_checksum,
 };
 
-pub(crate) fn write_cta861_extension(cta: &Cta861Extension) -> Vec<u8> {
-    let Some(data_block_bytes) = serialize_data_blocks(&cta.data_blocks) else {
-        return cta.raw_block.clone();
-    };
+pub(crate) fn write_cta861_extension(cta: &Cta861Extension) -> Result<Vec<u8>, EdidError> {
+    let data_block_bytes = serialize_data_blocks(&cta.data_blocks)?;
 
     if data_block_bytes.len() > 123 {
-        return cta.raw_block.clone();
+        return Err(EdidError::ValidationError(
+            "CTA-861 data blocks exceed 123-byte payload budget".to_owned(),
+        ));
     }
 
     let old_offset = usize::from(cta.detailed_timing_offset).clamp(4, 127);
@@ -43,38 +44,41 @@ pub(crate) fn write_cta861_extension(cta: &Cta861Extension) -> Vec<u8> {
     }
 
     fix_checksum(&mut block);
-    block
+    Ok(block)
 }
 
-fn serialize_data_blocks(blocks: &[DataBlock]) -> Option<Vec<u8>> {
+fn serialize_data_blocks(blocks: &[DataBlock]) -> Result<Vec<u8>, EdidError> {
     let mut out = Vec::new();
 
     for block in blocks {
         let (tag, payload) = serialize_data_block(block)?;
         if payload.len() > 0x1f {
-            return None;
+            return Err(EdidError::ValidationError(format!(
+                "CTA data block payload exceeds 31-byte limit for tag {}",
+                tag
+            )));
         }
 
         out.push((tag << 5) | payload.len() as u8);
         out.extend_from_slice(&payload);
     }
 
-    Some(out)
+    Ok(out)
 }
 
-fn serialize_data_block(block: &DataBlock) -> Option<(u8, Vec<u8>)> {
+fn serialize_data_block(block: &DataBlock) -> Result<(u8, Vec<u8>), EdidError> {
     match block {
-        DataBlock::Video(video) => Some((0x02, video.vic_codes.clone())),
+        DataBlock::Video(video) => Ok((0x02, video.vic_codes.clone())),
         DataBlock::Audio(audio) => {
             let payload = audio
                 .short_audio_descriptors
                 .iter()
                 .flat_map(|descriptor| descriptor.iter().copied())
                 .collect();
-            Some((0x01, payload))
+            Ok((0x01, payload))
         }
-        DataBlock::Vendor(vendor) => Some((0x03, serialize_vendor_block(vendor))),
-        DataBlock::SpeakerAllocation(block) => Some((0x04, block.bytes.clone())),
+        DataBlock::Vendor(vendor) => Ok((0x03, serialize_vendor_block(vendor))),
+        DataBlock::SpeakerAllocation(block) => Ok((0x04, block.bytes.clone())),
         DataBlock::HdrStaticMetadata(block) => {
             let mut payload = vec![
                 0x06,
@@ -90,16 +94,19 @@ fn serialize_data_block(block: &DataBlock) -> Option<(u8, Vec<u8>)> {
             if let Some(value) = block.desired_content_min_luminance {
                 payload.push(value);
             }
-            Some((0x07, payload))
+            Ok((0x07, payload))
         }
         DataBlock::Extended(block) => {
             let mut payload = Vec::with_capacity(1 + block.payload.len());
             payload.push(block.extended_tag);
             payload.extend_from_slice(&block.payload);
-            Some((0x07, payload))
+            Ok((0x07, payload))
         }
-        DataBlock::Unknown { tag, payload } if *tag <= 0x07 => Some((*tag, payload.clone())),
-        DataBlock::Unknown { .. } => None,
+        DataBlock::Unknown { tag, payload } if *tag <= 0x07 => Ok((*tag, payload.clone())),
+        DataBlock::Unknown { tag, .. } => Err(EdidError::ValidationError(format!(
+            "CTA data block tag {} is out of range",
+            tag
+        ))),
     }
 }
 

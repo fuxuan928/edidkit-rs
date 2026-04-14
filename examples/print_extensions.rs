@@ -84,11 +84,11 @@ fn print_base_summary(edid: &Edid) {
     println!("video input: {}", video_input_summary(edid));
     println!(
         "monitor name: {}",
-        monitor_name(edid).unwrap_or("<not present>")
+        edid.monitor_name().unwrap_or("<not present>")
     );
     println!(
         "monitor serial: {}",
-        monitor_serial(edid).unwrap_or("<not present>")
+        edid.monitor_serial().unwrap_or("<not present>")
     );
     println!("extensions: {}", edid.extensions.len());
     print_descriptors(edid);
@@ -175,26 +175,6 @@ fn print_displayid_extension(index: usize, display_id: &edidkit::displayid::Disp
     }
 }
 
-fn monitor_name(edid: &Edid) -> Option<&str> {
-    edid.base
-        .descriptors
-        .iter()
-        .find_map(|descriptor| match descriptor {
-            Descriptor::MonitorName(name) => Some(name.as_str()),
-            _ => None,
-        })
-}
-
-fn monitor_serial(edid: &Edid) -> Option<&str> {
-    edid.base
-        .descriptors
-        .iter()
-        .find_map(|descriptor| match descriptor {
-            Descriptor::MonitorSerial(serial) => Some(serial.as_str()),
-            _ => None,
-        })
-}
-
 fn video_input_summary(edid: &Edid) -> String {
     match &edid.base.video_input_definition {
         VideoInputDefinition::Analog(input) => format!(
@@ -232,6 +212,7 @@ fn print_descriptors(edid: &Edid) {
                 range.max_horizontal_khz,
                 range.max_pixel_clock_mhz
             ),
+            Descriptor::Unused => println!("  [{index}] unused descriptor slot"),
             Descriptor::Unknown(_) => println!("  [{index}] unknown descriptor"),
         }
     }

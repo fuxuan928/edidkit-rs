@@ -34,6 +34,9 @@ pub(crate) fn parse_base_block(block: &[u8]) -> Result<BaseBlock, EdidError> {
     for chunk in block[54..126].chunks_exact(18) {
         descriptors.push(parse_descriptor(chunk)?);
     }
+    let descriptors = descriptors
+        .try_into()
+        .expect("base block must contain exactly four descriptors");
 
     Ok(BaseBlock {
         manufacturer_id,
