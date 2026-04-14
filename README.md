@@ -1,5 +1,10 @@
 # edidkit
 
+[![crates.io](https://img.shields.io/crates/v/edidkit.svg)](https://crates.io/crates/edidkit)
+[![docs.rs](https://img.shields.io/docsrs/edidkit)](https://docs.rs/edidkit)
+[![CI](https://github.com/fuxuan928/edidkit-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/fuxuan928/edidkit-rs/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE-MIT)
+
 `edidkit` is a Rust library for parsing, inspecting, editing, and re-serializing EDID data.
 
 The project targets practical EDID workflows: keep unknown data intact, expose known fields through typed APIs, and make safe round-trip serialization possible.
